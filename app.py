@@ -4,11 +4,13 @@ import numpy as np
 from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
-from blueprint_parser import parse_blueprint
+from blueprint_parser import parse_blueprint  # type: ignore
 from stl import mesh  # type: ignore
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])
+
+# Allow CORS for frontend hosted on Render
+CORS(app, resources={r"/*": {"origins": "https://threed-model-frontend.onrender.com"}}, supports_credentials=True)
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
@@ -43,19 +45,18 @@ def convert_numpy_types(obj):
         return obj
 
 def create_box(x, y, width, height, thickness):
-    """Creates a 3D box with thickness as height in Z-axis."""
     z = 0
     vertices = np.array([
         [x, y, z], [x + width, y, z], [x + width, y + height, z], [x, y + height, z],
         [x, y, z + thickness], [x + width, y, z + thickness], [x + width, y + height, z + thickness], [x, y + height, z + thickness]
     ])
     faces = np.array([
-        [0, 1, 2], [0, 2, 3],        # bottom
-        [4, 7, 6], [4, 6, 5],        # top
-        [0, 4, 5], [0, 5, 1],        # front
-        [1, 5, 6], [1, 6, 2],        # right
-        [2, 6, 7], [2, 7, 3],        # back
-        [3, 7, 4], [3, 4, 0]         # left
+        [0, 1, 2], [0, 2, 3],
+        [4, 7, 6], [4, 6, 5],
+        [0, 4, 5], [0, 5, 1],
+        [1, 5, 6], [1, 6, 2],
+        [2, 6, 7], [2, 7, 3],
+        [3, 7, 4], [3, 4, 0]
     ])
     return vertices, faces
 
@@ -165,7 +166,7 @@ def upload_file():
             'status': 'success',
             'filename': unique_filename,
             'parse_result': convert_numpy_types(parsed_shapes),
-            'url': f'http://localhost:5000/uploads/{unique_filename}'
+            'url': f'/uploads/{unique_filename}'
         })
 
     return jsonify({'status': 'fail', 'message': 'Unsupported file type'}), 400
@@ -204,12 +205,13 @@ def generate_stl():
 
         return jsonify({
             'status': 'success',
-            'url': f'http://localhost:5000/generated_stls/{stl_filename}'
+            'url': f'/generated_stls/{stl_filename}'
         })
 
     except Exception as e:
         return jsonify({'status': 'fail', 'message': str(e)}), 500
 
+# The line `if __name__ == '__main__':` is a common Python idiom used to check if the current script
+# is being run directly by the Python interpreter.
 if __name__ == '__main__':
-    app.run(debug=True)
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
